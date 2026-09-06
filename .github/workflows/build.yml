@@ -24,24 +24,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: 21
           distribution: zulu
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -54,11 +54,11 @@ jobs:
         run: cargo test --release
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Cache ONDK
         id: ondk-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/ondk
           key: ondk-${{ env.ONDK_VERSION }}-linux
@@ -75,15 +75,18 @@ jobs:
         run: rustup toolchain link ondk "${{ runner.temp }}/ondk/toolchains/rust"
 
       - name: Decode Android signing key
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY }}
         run: |
-          echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > keystore.jks
+          # --ignore-garbage parametresi boşluk ve satır atlamalarını yoksayar, hatayı çözer
+          echo "$SIGNING_KEY_BASE64" | base64 --decode --ignore-garbage > "$GITHUB_WORKSPACE/keystore.jks"
 
       - name: Build Release APK
         run: |
           export ONDK_HOME="${{ runner.temp }}/ondk"
           export ANDROID_NDK_HOME="$ONDK_HOME"
           export NDK_ROOT="$ONDK_HOME"
-          export KEYSTORE_PATH="../keystore.jks"
+          export KEYSTORE_PATH="$GITHUB_WORKSPACE/keystore.jks"
           export KEYSTORE_PASS="${{ secrets.KEY_STORE_PASSWORD }}"
           export KEY_ALIAS="${{ secrets.ALIAS }}"
           export KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}"
@@ -93,7 +96,7 @@ jobs:
         run: mv app/build/outputs/apk/release/*.apk GhostLock-release.apk
 
       - name: Upload Release APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: GhostLock-release
           path: GhostLock-release.apk
@@ -103,11 +106,11 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && github.ref_type != 'tag' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: artifacts
 
@@ -117,3 +120,4 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           BOT_API_LINK: ${{ secrets.BOT_API_LINK }}
         run: bash .github/scripts/post_telegram.sh
+
